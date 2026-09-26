@@ -1,0 +1,160 @@
+{
+  "document": {
+    "title": "UAV Flight Control — Requirements Verification Matrix",
+    "standard": "SysML / IBM Rhapsody MBSE",
+    "project": "UAV Flight Control CONOPS & Statechart Model",
+    "version": "1.0.0",
+    "description": "Maps system requirements to statechart transition triggers, verification methods, subsystem allocations, and compliance status."
+  },
+  "subsystems": [
+    {
+      "id": "BLK-FC",
+      "name": "FlightComputerBlk",
+      "sysml_stereotype": "block",
+      "responsibility": "Mission manager, statechart host, fail-safe arbiter"
+    },
+    {
+      "id": "BLK-TEL",
+      "name": "TelemetryBlk",
+      "sysml_stereotype": "block",
+      "responsibility": "Uplink/downlink health and link-quality monitoring"
+    },
+    {
+      "id": "BLK-NAV",
+      "name": "NavigationBlk",
+      "sysml_stereotype": "block",
+      "responsibility": "GNSS/IMU fusion and geo-fence enforcement"
+    },
+    {
+      "id": "BLK-PROP",
+      "name": "PropulsionBlk",
+      "sysml_stereotype": "block",
+      "responsibility": "Motor/ESC control and battery state-of-charge reporting"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-SYS-001",
+      "statement": "The Flight Computer shall transition from STANDBY to TAKEOFF upon receipt of a valid arm_and_launch operator command.",
+      "priority": "High",
+      "conops_phase": "Pre-Flight / Takeoff",
+      "trigger": "arm_and_launch",
+      "from_state": "STANDBY",
+      "to_state": "TAKEOFF",
+      "verification_method": "Test",
+      "allocation": ["FlightComputerBlk"],
+      "allocation_ids": ["BLK-FC"],
+      "compliance_status": "Compliant",
+      "evidence": "tests/test_state_machine.py::test_arm_and_launch_transitions_to_takeoff"
+    },
+    {
+      "id": "REQ-SYS-002",
+      "statement": "The Flight Computer shall transition from TAKEOFF to CRUISE when NavigationBlk reports altitude_reached.",
+      "priority": "High",
+      "conops_phase": "Takeoff / Autonomous Cruise",
+      "trigger": "altitude_reached",
+      "from_state": "TAKEOFF",
+      "to_state": "CRUISE",
+      "verification_method": "Sim",
+      "allocation": ["FlightComputerBlk", "NavigationBlk"],
+      "allocation_ids": ["BLK-FC", "BLK-NAV"],
+      "compliance_status": "Compliant",
+      "evidence": "tests/test_state_machine.py::test_altitude_reached_enters_cruise"
+    },
+    {
+      "id": "REQ-SYS-003",
+      "statement": "The Flight Computer shall transition to FAILSAFE_RTB upon TelemetryBlk detection of signal_loss while airborne.",
+      "priority": "Critical",
+      "conops_phase": "Emergency Fail-Safe (Return-to-Base)",
+      "trigger": "signal_loss",
+      "from_state": ["TAKEOFF", "CRUISE"],
+      "to_state": "FAILSAFE_RTB",
+      "verification_method": "Test",
+      "allocation": ["TelemetryBlk", "FlightComputerBlk"],
+      "allocation_ids": ["BLK-TEL", "BLK-FC"],
+      "compliance_status": "Compliant",
+      "evidence": "tests/test_state_machine.py::test_signal_loss_failsafe_under_100ms"
+    },
+    {
+      "id": "REQ-SYS-004",
+      "statement": "Fail-safe state transitions shall complete in less than 100 milliseconds from trigger detection.",
+      "priority": "Critical",
+      "conops_phase": "Emergency Fail-Safe (Return-to-Base)",
+      "trigger": ["signal_loss", "low_battery", "geo_fence_breach"],
+      "from_state": ["TAKEOFF", "CRUISE"],
+      "to_state": "FAILSAFE_RTB",
+      "verification_method": "Test",
+      "allocation": ["FlightComputerBlk"],
+      "allocation_ids": ["BLK-FC"],
+      "compliance_status": "Compliant",
+      "latency_budget_ms": 100,
+      "evidence": "tests/test_state_machine.py::test_signal_loss_failsafe_under_100ms"
+    },
+    {
+      "id": "REQ-SYS-005",
+      "statement": "The Flight Computer shall transition to FAILSAFE_RTB upon PropulsionBlk detection of low_battery while airborne.",
+      "priority": "Critical",
+      "conops_phase": "Emergency Fail-Safe (Return-to-Base)",
+      "trigger": "low_battery",
+      "from_state": ["TAKEOFF", "CRUISE"],
+      "to_state": "FAILSAFE_RTB",
+      "verification_method": "Test",
+      "allocation": ["PropulsionBlk", "FlightComputerBlk"],
+      "allocation_ids": ["BLK-PROP", "BLK-FC"],
+      "compliance_status": "Compliant",
+      "evidence": "tests/test_state_machine.py::test_low_battery_forces_failsafe_rtb"
+    },
+    {
+      "id": "REQ-SYS-006",
+      "statement": "The Flight Computer shall transition to FAILSAFE_RTB upon NavigationBlk detection of geo_fence_breach while airborne.",
+      "priority": "Critical",
+      "conops_phase": "Emergency Fail-Safe (Return-to-Base)",
+      "trigger": "geo_fence_breach",
+      "from_state": ["TAKEOFF", "CRUISE"],
+      "to_state": "FAILSAFE_RTB",
+      "verification_method": "Test",
+      "allocation": ["NavigationBlk", "FlightComputerBlk"],
+      "allocation_ids": ["BLK-NAV", "BLK-FC"],
+      "compliance_status": "Compliant",
+      "evidence": "tests/test_state_machine.py::test_geo_fence_breach_forces_failsafe_rtb"
+    },
+    {
+      "id": "REQ-SYS-007",
+      "statement": "Following FAILSAFE_RTB, the system shall transition through LANDING to STANDBY upon home_acquired and touchdown.",
+      "priority": "High",
+      "conops_phase": "Landing",
+      "trigger": ["home_acquired", "touchdown"],
+      "from_state": "FAILSAFE_RTB",
+      "to_state": "STANDBY",
+      "verification_method": "Sim",
+      "allocation": ["FlightComputerBlk", "NavigationBlk"],
+      "allocation_ids": ["BLK-FC", "BLK-NAV"],
+      "compliance_status": "Compliant",
+      "evidence": "tests/test_state_machine.py::test_failsafe_rtb_completes_landing_to_standby"
+    },
+    {
+      "id": "REQ-SYS-008",
+      "statement": "All state transitions shall be logged to a telemetry trace with microsecond-resolution timestamps.",
+      "priority": "Medium",
+      "conops_phase": "All",
+      "trigger": "*",
+      "from_state": "*",
+      "to_state": "*",
+      "verification_method": "Test",
+      "allocation": ["FlightComputerBlk"],
+      "allocation_ids": ["BLK-FC"],
+      "compliance_status": "Compliant",
+      "evidence": "tests/test_state_machine.py::test_trace_contains_microsecond_timestamps; output/flight_telemetry_trace.json"
+    }
+  ],
+  "summary": {
+    "total_requirements": 8,
+    "compliant": 8,
+    "partial": 0,
+    "non_compliant": 0,
+    "verification_methods": {
+      "Test": 6,
+      "Sim": 2
+    }
+  }
+}
